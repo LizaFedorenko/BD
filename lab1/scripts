@@ -1,0 +1,73 @@
+import psycopg2
+import threading
+import time
+def update_counter_lost_update():
+    conn = psycopg2.connect(**DB_PARAMS)
+    cursor = conn.cursor()
+    for _ in range(10_000):  
+        cursor.execute("SELECT counter FROM user_counter WHERE user_id = 1")
+        counter = cursor.fetchone()
+        counter = counter[0]
+        counter = counter + 1
+        cursor.execute("UPDATE user_counter SET counter = %s WHERE user_id = 1", (counter,))
+        conn.commit()
+    
+    cursor.close()
+    conn.close()
+
+
+def update_counter_in_placeupdate():
+    conn = psycopg2.connect(**DB_PARAMS)
+    cursor = conn.cursor()
+    for _ in range(10_000):  
+        cursor.execute("UPDATE user_counter SET counter = counter + 1 WHERE user_id = %s", (1,))
+        conn.commit()
+    cursor.close()
+    conn.close()
+
+def update_counter_row_level_locking():
+    conn = psycopg2.connect(**DB_PARAMS)
+    cursor = conn.cursor()
+
+    for _ in range(10_000):  
+        cursor.execute("SELECT counter FROM user_counter WHERE user_id = 1 FOR UPDATE")
+        counter = cursor.fetchone()
+        counter = counter[0]
+        counter = counter + 1
+        cursor.execute("UPDATE user_counter SET counter = %s WHERE user_id = %s", (counter, 1))
+        conn.commit()
+    cursor.close()
+    conn.close()
+
+
+def update_counter_optimistic_concurrency_control():
+    conn = psycopg2.connect(**DB_PARAMS)
+    cursor = conn.cursor()
+    for _ in range(10_000):
+        while True:
+            cursor.execute("SELECT counter, version FROM user_counter WHERE user_id = 1")
+            counter = cursor.fetchone()
+            counter, version = counter
+            counter = counter + 1
+            cursor.execute("update user_counter set counter = %s, version = %s where user_id = %s and version = %s", (counter, version + 1, 1, version))
+            conn.commit()
+            count = cursor.rowcount
+            if (count > 0): break
+    cursor.close()
+    conn.close()
+
+threads = []
+start_time = time.time()
+
+for _ in range(10):
+    thread = threading.Thread(target=update_counter_optimistic_concurrency_control)
+    threads.append(thread)
+    thread.start()
+
+for thread in threads:
+    thread.join()
+
+end_time = time.time()
+
+print("__________________________________________________\n")
+print(f"Час виконання: {end_time - start_time:.2f} секунд")
