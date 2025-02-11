@@ -1,6 +1,15 @@
 import psycopg2
 import threading
 import time
+
+DB_PARAMS = {
+    "dbname": "lab1",
+    "user": "postgres",
+    "password": "", #############
+    "host": "", #############
+    "port": "" #############
+}
+
 def update_counter_lost_update():
     conn = psycopg2.connect(**DB_PARAMS)
     cursor = conn.cursor()
